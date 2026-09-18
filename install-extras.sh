@@ -67,6 +67,7 @@ detect() {
 	if [ -f /etc/openwrt_release ] || { [ -x /sbin/procd ] && [ -d /etc/config ]; }; then OS=openwrt
 	elif [ -f /etc/debian_version ]; then OS=debian
 	else OS=unknown; fi
+	PKG_PREPARED=no
 	if command -v apk >/dev/null 2>&1; then PKG=apk
 	elif command -v opkg >/dev/null 2>&1; then PKG=opkg
 	elif command -v apt-get >/dev/null 2>&1; then PKG=apt
@@ -77,12 +78,26 @@ detect() {
 	else DL=""; fi
 }
 
+pkg_each() {
+	for _p in "$@"; do
+		pkg "$_p" >/dev/null 2>&1 && ok "已安装 $_p" || warn "安装 $_p 失败(可忽略)"
+	done
+}
+
 pkg() {
 	[ -n "$PKG" ] || { warn "未识别的包管理器,请手工安装: $*"; return 1; }
+	if [ "$PKG_PREPARED" = no ]; then
+		case "$PKG" in
+			apk)  run apk update >/dev/null 2>&1 || true ;;
+			opkg) run opkg update >/dev/null 2>&1 || true ;;
+			apt)  run apt-get update -qq >/dev/null 2>&1 || true ;;
+		esac
+		PKG_PREPARED=yes
+	fi
 	case "$PKG" in
-		apk)  run apk update >/dev/null 2>&1 || true; run apk add --no-cache "$@" ;;
-		opkg) run opkg update >/dev/null 2>&1 || true; run opkg install "$@" ;;
-		apt)  run apt-get update -qq >/dev/null 2>&1 || true; run apt-get install -y "$@" ;;
+		apk)  run apk add --no-cache "$@" ;;
+		opkg) run opkg install "$@" ;;
+		apt)  run apt-get install -y "$@" ;;
 	esac
 }
 
@@ -100,13 +115,13 @@ KIT_DIR="$HOME/n30kit"
 openwrt_extras() {
 	if [ "$WITH_TOOLS" = yes ] || [ "$WITH_PROXY" = no ] && [ "$WITH_OPENCLASH" = no ] && [ "$WITH_PASSWALL" = no ] && [ "$WITH_TTYD" = no ]; then
 		step "安装常用工具"
-		pkg curl ca-bundle nano htop || warn "部分工具安装失败(不影响使用)"
+		pkg_each curl ca-bundle nano htop
 		ok "常用工具处理完成"
 	fi
 
 	if [ "$WITH_TTYD" = yes ]; then
 		step "安装网页终端 ttyd"
-		pkg ttyd || warn "ttyd 安装失败"
+		pkg_each ttyd
 		[ "$DRY_RUN" = no ] && { /etc/init.d/ttyd enable 2>/dev/null || true; /etc/init.d/ttyd start 2>/dev/null || true; }
 		ok "ttyd:http://192.168.1.1:7681"
 	fi
@@ -115,11 +130,11 @@ openwrt_extras() {
 
 	if [ "$WITH_OPENCLASH" = yes ]; then
 		step "安装 OpenClash"
-		pkg luci-app-openclash || warn "OpenClash 安装失败(检查 apk 源)"
+		pkg_each luci-app-openclash
 	fi
 	if [ "$WITH_PASSWALL" = yes ]; then
 		step "安装 PassWall(含中文包)"
-		pkg luci-app-passwall luci-i18n-passwall-zh-cn || warn "PassWall 安装失败"
+		pkg_each luci-app-passwall luci-i18n-passwall-zh-cn
 	fi
 
 	step "环境自检"
@@ -154,7 +169,7 @@ debian_extras() {
 
 	if [ "$WITH_TFTP" = yes ]; then
 		step "安装并配置 TFTP 服务"
-		pkg tftpd-hpa tcpdump curl || warn "TFTP 安装失败"
+		pkg_each tftpd-hpa tcpdump curl
 		run mkdir -p /srv/tftp && run chmod 755 /srv/tftp
 		if [ "$DRY_RUN" = no ] && [ -d /etc/default ]; then
 			cat > /etc/default/tftpd-hpa <<'EOF'

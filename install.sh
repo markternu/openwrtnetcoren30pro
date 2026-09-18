@@ -78,6 +78,7 @@ detect_os() {
 }
 
 PKG=""
+PKG_PREPARED=no
 detect_pkg() {
 	if command -v apk >/dev/null 2>&1; then PKG=apk
 	elif command -v opkg >/dev/null 2>&1; then PKG=opkg
@@ -85,16 +86,28 @@ detect_pkg() {
 	else PKG=""; fi
 }
 
+# 逐个安装(某个包名不存在时,不影响其它包)
+pkg_install_each() {
+	for _p in "$@"; do
+		pkg_install "$_p" >/dev/null 2>&1 && ok "已安装 $_p" || warn "安装 $_p 失败(可能源里没有,可忽略)"
+	done
+}
+
 # 安装系统包(自动适配 apk / opkg / apt)
 pkg_install() {
 	[ -n "$PKG" ] || { warn "未识别的包管理器,请手工安装: $*"; return 1; }
+	if [ "$PKG_PREPARED" = no ]; then
+		case "$PKG" in
+			apk)  run apk update >/dev/null 2>&1 || true ;;
+			opkg) run opkg update >/dev/null 2>&1 || true ;;
+			apt)  run apt-get update -qq >/dev/null 2>&1 || true ;;
+		esac
+		PKG_PREPARED=yes
+	fi
 	case "$PKG" in
-		apk)  run apk update >/dev/null 2>&1 || true
-		      run apk add --no-cache "$@" ;;
-		opkg) run opkg update >/dev/null 2>&1 || true
-		      run opkg install "$@" ;;
-		apt)  run apt-get update -qq >/dev/null 2>&1 || true
-		      run apt-get install -y "$@" ;;
+		apk)  run apk add --no-cache "$@" ;;
+		opkg) run opkg install "$@" ;;
+		apt)  run apt-get install -y "$@" ;;
 	esac
 }
 
@@ -197,11 +210,11 @@ install_ohmyzsh() {
 	# 1) 依赖:先装关键项(zsh/git),再装可选证书与 https 支持
 	if ! command -v zsh >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
 		say "  安装依赖:zsh git"
-		pkg_install zsh git || true
+		pkg_install_each zsh git
 	fi
 	case "$OS" in
-		openwrt) pkg_install ca-bundle ca-certificates git-http || true ;;
-		debian)  pkg_install curl ca-certificates || true ;;
+		openwrt) pkg_install_each ca-bundle ca-certificates git-http ;;
+		debian)  pkg_install_each curl ca-certificates ;;
 	esac
 	command -v zsh >/dev/null 2>&1 || die "zsh 安装失败。请先手工安装 zsh(apk add zsh / apt install zsh)后重跑"
 	ok "zsh: $(command -v zsh)"
