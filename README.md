@@ -218,6 +218,14 @@ git -C immortalwrt checkout 3c71dfc2b67dc7808d110afa66d66527f4b2ce2e
 > 本固件基于 ImmortalWrt 25.12-SNAPSHOT(`r37877-n30pro`),内核 `6.12.91`。
 > 早期内部迭代版本(未发布、存在刷机不生效问题)请勿使用。
 
+### 维护者:发布新版本时的清单
+
+1. 打 tag 并在 **Releases** 上传资产(主固件/initramfs/manifest/SHA256SUMS/kmods-apk);
+2. **同步更新仓库内 `firmware/` 下的两份 `.itb`** —— jsDelivr 通道镜像的就是这两个文件,
+   忘了更新会导致"通道②下载到的还是旧固件"(SHA256SUMS 校验能兜住这个问题,但会浪费一次下载);
+3. 如版本号变化,记得同步 `install-pi.sh` / `pi-fetch-firmware.sh` 里的 `DEFAULT_VERSION` 兜底值;
+4. 发布后用真机(树莓派)跑一次 `install-pi.sh --dry-run` 与正式运行,确认两条通道都能取到并校验通过。
+
 ---
 
 ## 来源与致谢
