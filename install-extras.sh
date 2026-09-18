@@ -63,6 +63,12 @@ warn() { printf '\033[1;33m  ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; exit 1; }
 run()  { if [ "$DRY_RUN" = yes ]; then say "    [dry-run] $*"; else "$@"; fi; }
 
+# 提权封装:root 直接跑,普通用户走 sudo
+if [ "$(id -u)" = "0" ]; then SUDO=""
+elif command -v sudo >/dev/null 2>&1; then SUDO="sudo"
+else SUDO=""; fi
+asroot() { if [ -n "$SUDO" ]; then $SUDO "$@"; else "$@"; fi; }
+
 detect() {
 	if [ -f /etc/openwrt_release ] || { [ -x /sbin/procd ] && [ -d /etc/config ]; }; then OS=openwrt
 	elif [ -f /etc/debian_version ]; then OS=debian
@@ -88,16 +94,16 @@ pkg() {
 	[ -n "$PKG" ] || { warn "未识别的包管理器,请手工安装: $*"; return 1; }
 	if [ "$PKG_PREPARED" = no ]; then
 		case "$PKG" in
-			apk)  run apk update >/dev/null 2>&1 || true ;;
-			opkg) run opkg update >/dev/null 2>&1 || true ;;
-			apt)  run apt-get update -qq >/dev/null 2>&1 || true ;;
+			apk)  run asroot apk update >/dev/null 2>&1 || true ;;
+			opkg) run asroot opkg update >/dev/null 2>&1 || true ;;
+			apt)  run asroot apt-get update -qq >/dev/null 2>&1 || true ;;
 		esac
 		PKG_PREPARED=yes
 	fi
 	case "$PKG" in
-		apk)  run apk add --no-cache "$@" ;;
-		opkg) run opkg install "$@" ;;
-		apt)  run apt-get install -y "$@" ;;
+		apk)  run asroot apk add --no-cache "$@" ;;
+		opkg) run asroot opkg install "$@" ;;
+		apt)  run asroot apt-get install -y "$@" ;;
 	esac
 }
 
@@ -122,7 +128,7 @@ openwrt_extras() {
 	if [ "$WITH_TTYD" = yes ]; then
 		step "安装网页终端 ttyd"
 		pkg_each ttyd
-		[ "$DRY_RUN" = no ] && { /etc/init.d/ttyd enable 2>/dev/null || true; /etc/init.d/ttyd start 2>/dev/null || true; }
+		[ "$DRY_RUN" = no ] && { asroot /etc/init.d/ttyd enable 2>/dev/null || true; asroot /etc/init.d/ttyd start 2>/dev/null || true; }
 		ok "ttyd:http://192.168.1.1:7681"
 	fi
 
@@ -171,7 +177,7 @@ debian_extras() {
 	if [ "$WITH_TFTP" = yes ]; then
 		step "安装并配置 TFTP 服务"
 		pkg_each tftpd-hpa tcpdump curl
-		run mkdir -p /srv/tftp && run chmod 755 /srv/tftp
+		run asroot mkdir -p /srv/tftp && run asroot chmod 755 /srv/tftp
 		if [ "$DRY_RUN" = no ] && [ -d /etc/default ]; then
 			cat > /etc/default/tftpd-hpa <<'EOF'
 TFTP_USERNAME="tftp"
@@ -180,7 +186,7 @@ TFTP_ADDRESS="0.0.0.0:69"
 TFTP_OPTIONS="--secure --create"
 EOF
 		fi
-		run systemctl restart tftpd-hpa 2>/dev/null || run service tftpd-hpa restart 2>/dev/null || true
+		run asroot systemctl restart tftpd-hpa 2>/dev/null || run asroot service tftpd-hpa restart 2>/dev/null || true
 		ok "TFTP 服务已配置(/srv/tftp)"
 	fi
 

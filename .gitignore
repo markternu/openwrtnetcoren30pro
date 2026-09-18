@@ -1,10 +1,16 @@
-# 固件二进制不进 git(通过 GitHub Releases 分发)
+# 固件二进制:默认通过 GitHub Releases 分发
 *.itb
 *.bin
 *.fip
 *.apk
-firmware/
 kmods-apk/
+
+# 例外:仓库内保留固件副本,让 jsDelivr(国内可用的 CDN)能镜像它。
+# install-pi.sh / pi-fetch-firmware.sh 的下载通道:
+#   ① GitHub Release 直链
+#   ② jsDelivr 镜像仓库内 firmware/ 下的这两个文件
+# 两条通道的内容都来自本仓库,不含任何第三方镜像站。
+!firmware/*.itb
 
 # 系统/编辑器
 .DS_Store

@@ -64,6 +64,12 @@ warn() { printf '\033[1;33m  ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; exit 1; }
 run()  { if [ "$DRY_RUN" = yes ]; then say "    [dry-run] $*"; else "$@"; fi; }
 
+# 提权封装:root 直接跑,普通用户走 sudo
+if [ "$(id -u)" = "0" ]; then SUDO=""
+elif command -v sudo >/dev/null 2>&1; then SUDO="sudo"
+else SUDO=""; fi
+asroot() { if [ -n "$SUDO" ]; then $SUDO "$@"; else "$@"; fi; }
+
 # ---------------------------------------------------------------- 平台识别
 detect_os() {
 	if [ -f /etc/openwrt_release ] || { [ -x /sbin/procd ] && [ -d /etc/config ]; }; then
@@ -98,16 +104,16 @@ pkg_install() {
 	[ -n "$PKG" ] || { warn "未识别的包管理器,请手工安装: $*"; return 1; }
 	if [ "$PKG_PREPARED" = no ]; then
 		case "$PKG" in
-			apk)  run apk update >/dev/null 2>&1 || true ;;
-			opkg) run opkg update >/dev/null 2>&1 || true ;;
-			apt)  run apt-get update -qq >/dev/null 2>&1 || true ;;
+			apk)  run asroot apk update >/dev/null 2>&1 || true ;;
+			opkg) run asroot opkg update >/dev/null 2>&1 || true ;;
+			apt)  run asroot apt-get update -qq >/dev/null 2>&1 || true ;;
 		esac
 		PKG_PREPARED=yes
 	fi
 	case "$PKG" in
-		apk)  run apk add --no-cache "$@" ;;
-		opkg) run opkg install "$@" ;;
-		apt)  run apt-get install -y "$@" ;;
+		apk)  run asroot apk add --no-cache "$@" ;;
+		opkg) run asroot opkg install "$@" ;;
+		apt)  run asroot apt-get install -y "$@" ;;
 	esac
 }
 
@@ -150,10 +156,10 @@ uninstall_omz() {
 	fi
 	case "$OS" in
 		openwrt)
-			run sed -i "s|^root:\(.*\):[^:]*$|root:\1:/bin/ash|" /etc/passwd 2>/dev/null || true
+			run asroot sed -i "s|^root:\(.*\):[^:]*$|root:\1:/bin/ash|" /etc/passwd 2>/dev/null || true
 			ok "root 登录 shell 已还原为 /bin/ash" ;;
 		debian)
-			run chsh -s /bin/bash "$(id -un)" 2>/dev/null || true
+			run asroot chsh -s /bin/bash "$(id -un)" 2>/dev/null || true
 			ok "登录 shell 已还原为 /bin/bash" ;;
 	esac
 	say ""
@@ -161,7 +167,11 @@ uninstall_omz() {
 }
 
 write_zshrc() {
-	[ -f "$ZSHRC" ] && run cp -f "$ZSHRC" "$ZSHRC.pre-n30pro.bak"
+	# 只在"第一次"备份,避免重跑时把用户原始 .zshrc 的备份覆盖掉
+	if [ -f "$ZSHRC" ] && [ ! -f "$ZSHRC.pre-n30pro.bak" ]; then
+		run cp -f "$ZSHRC" "$ZSHRC.pre-n30pro.bak"
+		ok "已备份原 .zshrc 为 .zshrc.pre-n30pro.bak"
+	fi
 	if [ "$DRY_RUN" = yes ]; then say "    [dry-run] 写入 $ZSHRC"; return 0; fi
 	cat > "$ZSHRC" <<EOF
 # ~/.zshrc  (由 openwrtnetcoren30pro/install.sh 生成)
@@ -193,11 +203,11 @@ set_login_shell() {
 			if grep -q "^root:.*:${ZSH_BIN}$" /etc/passwd 2>/dev/null; then
 				ok "root 登录 shell 已是 $ZSH_BIN"
 			else
-				run sed -i "s|^root:\(.*\):[^:]*$|root:\1:${ZSH_BIN}|" /etc/passwd
+				run asroot sed -i "s|^root:\(.*\):[^:]*$|root:\1:${ZSH_BIN}|" /etc/passwd
 				ok "root 登录 shell 已设为 $ZSH_BIN(已运行中的会话用 'exec zsh' 立即切换)"
 			fi ;;
 		debian)
-			run chsh -s "$ZSH_BIN" "$(id -un)" 2>/dev/null || warn "chsh 失败,可手工执行: chsh -s $ZSH_BIN"
+			run asroot chsh -s "$ZSH_BIN" "$(id -un)" 2>/dev/null || warn "chsh 失败,可手工执行: sudo chsh -s $ZSH_BIN $(id -un)"
 			ok "登录 shell 已设为 $ZSH_BIN" ;;
 		*)
 			warn "未识别的系统,请手工把登录 shell 设为 $ZSH_BIN" ;;
@@ -279,8 +289,8 @@ with_flashkit() {
 with_tftp() {
 	step "安装并配置 TFTP 服务"
 	pkg_install tftpd-hpa tcpdump curl || true
-	run mkdir -p /srv/tftp
-	run chmod 755 /srv/tftp
+	run asroot mkdir -p /srv/tftp
+	run asroot chmod 755 /srv/tftp
 	if [ "$DRY_RUN" = no ] && [ -d /etc/default ]; then
 		cat > /etc/default/tftpd-hpa <<'EOF'
 TFTP_USERNAME="tftp"
@@ -289,7 +299,7 @@ TFTP_ADDRESS="0.0.0.0:69"
 TFTP_OPTIONS="--secure --create"
 EOF
 	fi
-	run systemctl restart tftpd-hpa 2>/dev/null || run service tftpd-hpa restart 2>/dev/null || true
+	run asroot systemctl restart tftpd-hpa 2>/dev/null || run asroot service tftpd-hpa restart 2>/dev/null || true
 	ok "TFTP 服务已配置(目录 /srv/tftp)"
 }
 

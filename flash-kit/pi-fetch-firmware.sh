@@ -18,6 +18,7 @@
 set -e
 
 REPO="markternu/openwrtnetcoren30pro"
+BRANCH="main"
 DEFAULT_VERSION="v1.0.0"
 DEST="/tmp/n30pro-firmware"
 INSTALL=no
@@ -51,6 +52,25 @@ else
 	echo "缺少 curl 或 wget,请先: sudo apt install -y curl"; exit 1
 fi
 
+# ---------- 多源下载(两个来源都属我们自己的仓库:GitHub 直链 / jsDelivr CDN) ----------
+fetch_asset() {   # fetch_asset <dest> <name>
+	_fd="$1"; _fn="$2"
+	for _u in \
+		"${BASE_URL}https://github.com/$REPO/releases/download/$VERSION/$_fn" \
+		"https://cdn.jsdelivr.net/gh/$REPO@$BRANCH/firmware/$_fn"
+	do
+		for _try in 1 2; do
+			if FETCH "$_u" "$_fd" 2>/dev/null && [ -s "$_fd" ]; then
+				echo "    ✓ $_fn [源:$(printf '%s' "$_u" | sed 's|https://||; s|/.*||')]"
+				return 0
+			fi
+			sleep 2
+		done
+		echo "    ! 该源失败,换下一个:$(printf '%s' "$_u" | sed 's|https://||; s|/.*||')"
+	done
+	return 1
+}
+
 # ---------- 确定版本 ----------
 if [ -z "$VERSION" ]; then
 	echo "==> 查询最新 release ..."
@@ -64,16 +84,15 @@ REL_BASE="${BASE_URL}https://github.com/$REPO/releases/download/$VERSION"
 mkdir -p "$DEST"
 
 echo "==> 下载 SHA256SUMS"
-FETCH "$REL_BASE/SHA256SUMS" "$DEST/SHA256SUMS"
+fetch_asset "$DEST/SHA256SUMS" SHA256SUMS || { echo "❌ SHA256SUMS 下载失败"; exit 1; }
 
 echo "==> 下载固件(约 26MB,慢的话耐心等)"
-for f in \
-	immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb \
-	immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb
-do
-	echo "    - $f"
-	FETCH "$REL_BASE/$f" "$DEST/$f"
-done
+fetch_asset "$DEST/immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb" \
+            immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb \
+	|| { echo "❌ 主固件下载失败"; exit 1; }
+fetch_asset "$DEST/immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb" \
+            immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb \
+	|| echo "⚠️  initramfs 未下载成功(不影响刷机)"
 
 echo "==> 校验 sha256"
 ( cd "$DEST" && grep -E "netis_nx30v2-(squashfs-sysupgrade|initramfs)\.itb" SHA256SUMS > .check \
@@ -88,7 +107,7 @@ if [ "$WITH_UBOOT" = "yes" ]; then
 	echo "==> 下载官方 u-boot FIP(换 u-boot 用)"
 	if GET "$UBOOT_URL/sha256sums" > "$DEST/sha256sums-immortalwrt" 2>/dev/null; then
 		FETCH "$UBOOT_URL/$UBOOT_FILE" "$DEST/$UBOOT_FILE"
-		( cd "$DEST" && grep " $UBOOT_FILE\$" sha256sums-immortalwrt > .ubcheck \
+		( cd "$DEST" && grep -E "[ *]${UBOOT_FILE}\$" sha256sums-immortalwrt > .ubcheck \
 			&& sha256sum -c .ubcheck && rm -f .ubcheck ) \
 			|| echo "⚠️  u-boot 校验未通过(官方 sha256sums 里没找到或下载不全),请手工核对"
 	else

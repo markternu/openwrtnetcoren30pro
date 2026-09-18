@@ -106,6 +106,39 @@ GET_STDOUT() {
 		*) return 1 ;;
 	esac
 }
+# ---------------------------------------------------------------- 多源下载
+# 只有两个来源,且都属于我们自己的仓库:
+#   ① GitHub Release 直链
+#   ② jsDelivr CDN(镜像仓库内 firmware/ 目录,国内通常更快;需固件已提交进仓库)
+# 用户还可用 --base-url 指定自己的镜像(会插到最前面)
+# 下载完成后一律用 SHA256SUMS 校验,换源不影响安全性
+fetch_asset() {   # fetch_asset <dest> <release|raw> <name-or-path>
+	_fd="$1"; _fk="$2"; _fn="$3"
+	case "$_fk" in
+		release)
+			# 两条通道都指向我们自己的仓库:GitHub 直链 / jsDelivr CDN(镜像仓库内 firmware/)
+			_urls="https://github.com/$REPO/releases/download/$VERSION/$_fn https://cdn.jsdelivr.net/gh/$REPO@$BRANCH/firmware/$_fn" ;;
+		raw)
+			_urls="https://raw.githubusercontent.com/$REPO/$BRANCH/$_fn https://cdn.jsdelivr.net/gh/$REPO@$BRANCH/$_fn" ;;
+		*) return 1 ;;
+	esac
+	if [ "$DRY_RUN" = yes ]; then
+		say "    [dry-run] 下载 $_fn(多源:GitHub → jsDelivr → 代理)"
+		return 0
+	fi
+	for _u in $_urls; do
+		_try=1
+		while [ "$_try" -le 2 ]; do
+			if GET_FILE "$_u" "$_fd" 2>/dev/null && [ -s "$_fd" ]; then
+				ok "  已下载 $_fn [源:$(printf '%s' "$_u" | sed 's|https://||; s|/.*||')]"
+				return 0
+			fi
+			_try=$((_try + 1)); sleep 2
+		done
+		warn "  该源失败,换下一个:$(printf '%s' "$_u" | sed 's|https://||; s|/.*||')"
+	done
+	return 1
+}
 # dry-run 时只打印,不真的下载
 PLAN_FETCH() {
 	if [ "$DRY_RUN" = yes ]; then say "    [dry-run] 下载 $1"; return 0; fi
@@ -125,16 +158,16 @@ pkg() {
 	[ -n "$PKG" ] || { warn "未识别的包管理器,请手工安装: $*"; return 1; }
 	if [ "$PKG_PREPARED" = no ]; then
 		case "$PKG" in
-			apt)  run apt-get update -qq >/dev/null 2>&1 || true ;;
-			apk)  run apk update >/dev/null 2>&1 || true ;;
-			opkg) run opkg update >/dev/null 2>&1 || true ;;
+			apt)  run asroot apt-get update -qq >/dev/null 2>&1 || true ;;
+			apk)  run asroot apk update >/dev/null 2>&1 || true ;;
+			opkg) run asroot opkg update >/dev/null 2>&1 || true ;;
 		esac
 		PKG_PREPARED=yes
 	fi
 	case "$PKG" in
-		apt)  run apt-get install -y "$@" ;;
-		apk)  run apk add --no-cache "$@" ;;
-		opkg) run opkg install "$@" ;;
+		apt)  run asroot apt-get install -y "$@" ;;
+		apk)  run asroot apk add --no-cache "$@" ;;
+		opkg) run asroot opkg install "$@" ;;
 	esac
 }
 pkg_each() {   # 逐个装,某个包名不存在不影响其他
@@ -177,7 +210,11 @@ install_omz() {
 
 	# .zshrc
 	ZSHRC="$TARGET_HOME/.zshrc"
-	[ -f "$ZSHRC" ] && run cp -f "$ZSHRC" "$ZSHRC.pre-n30pro.bak"
+	# 只在"第一次"备份,避免重跑时把用户原始 .zshrc 的备份覆盖掉
+	if [ -f "$ZSHRC" ] && [ ! -f "$ZSHRC.pre-n30pro.bak" ]; then
+		run cp -f "$ZSHRC" "$ZSHRC.pre-n30pro.bak"
+		ok "已备份原 .zshrc 为 .zshrc.pre-n30pro.bak"
+	fi
 	if [ "$DRY_RUN" = yes ]; then
 		say "    [dry-run] 写入 $ZSHRC"
 	else
@@ -257,12 +294,26 @@ fetch_firmware() {
 	run mkdir -p "$DEST"
 
 	say "  下载 SHA256SUMS 与固件(共约 26MB) ..."
-	PLAN_FETCH "$REL/SHA256SUMS" "$DEST/SHA256SUMS" || die "下载 SHA256SUMS 失败"
-	for f in immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb \
-	         immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb; do
-		say "    - $f"
-		PLAN_FETCH "$REL/$f" "$DEST/$f" || die "下载 $f 失败"
-	done
+	BASEDEST="$DEST"
+	( cd "$DEST" && true )
+	# SHA256SUMS 用 release 源;它很小,失败就直接终止
+	if [ "$DRY_RUN" = yes ]; then
+		say "    [dry-run] 下载 SHA256SUMS"
+	elif ! fetch_asset "$DEST/SHA256SUMS" release SHA256SUMS; then
+		die "下载 SHA256SUMS 失败(检查网络,或用 --base-url 指定镜像)"
+	fi
+	# 主固件必须成功
+	F_MAIN="immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb"
+	say "    - $F_MAIN"
+	if [ "$DRY_RUN" = no ] && ! fetch_asset "$DEST/$F_MAIN" release "$F_MAIN"; then
+		die "主固件下载失败(所有源都不可用;可加 --base-url 用镜像)"
+	fi
+	# initramfs 是可选救援件,失败只警告
+	F_REC="immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb"
+	say "    - $F_REC(可选)"
+	if [ "$DRY_RUN" = no ] && ! fetch_asset "$DEST/$F_REC" release "$F_REC"; then
+		warn "initramfs 未下载成功(不影响刷机;需要时从 Releases 手动下载)"
+	fi
 
 	say "  校验 sha256 ..."
 	if [ "$DRY_RUN" = yes ]; then
@@ -282,7 +333,7 @@ fetch_firmware() {
 		if PLAN_FETCH "$UB/sha256sums" "$DEST/sha256sums-iwrt" 2>/dev/null \
 		   && PLAN_FETCH "$UB/$FIP" "$DEST/$FIP"; then
 			if [ "$DRY_RUN" = no ]; then
-				( cd "$DEST" && grep " $FIP\$" sha256sums-iwrt > .ub && sha256sum -c .ub && rm -f .ub ) \
+				( cd "$DEST" && grep -E "[ *]${FIP}\$" sha256sums-iwrt > .ub && sha256sum -c .ub && rm -f .ub ) \
 					&& ok "u-boot FIP 校验通过" || warn "u-boot FIP 校验未通过,请手工核对"
 			fi
 		else
@@ -311,7 +362,7 @@ fetch_kit() {
 	run mkdir -p "$KIT"
 	for f in pi-net-on.sh pi-net-off.sh verify-after-boot.sh pi-fetch-firmware.sh pi-setup-tftp.sh; do
 		say "    - $f"
-		PLAN_FETCH "$RAW_BASE/flash-kit/$f" "$KIT/$f" || warn "下载 $f 失败"
+		fetch_asset "$KIT/$f" raw "flash-kit/$f" || warn "下载 $f 失败"
 	done
 	if [ "$DRY_RUN" = no ]; then
 		chmod +x "$KIT"/*.sh 2>/dev/null || true
