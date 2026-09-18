@@ -235,6 +235,8 @@ install_ohmyzsh() {
 				die "克隆 oh-my-zsh 失败(检查网络,或稍后重试)"
 			fi
 		}
+	elif [ "$DRY_RUN" = yes ]; then
+		say "    [dry-run] 下载并解压 oh-my-zsh 压缩包到 $OMZ_DIR"
 	else
 		warn "没有 git,改用压缩包方式安装(无法使用 'omz update')"
 		TMPTG="$(mktemp -d)"
@@ -267,7 +269,8 @@ with_flashkit() {
 	run mkdir -p "$KIT_DIR"
 	for f in pi-setup-tftp.sh pi-fetch-firmware.sh pi-net-on.sh pi-net-off.sh verify-after-boot.sh; do
 		say "  - $f"
-		fetch_to_file "$RAW_BASE/flash-kit/$f" "$KIT_DIR/$f" || warn "下载 $f 失败"
+		if [ "$DRY_RUN" = yes ]; then say "    [dry-run] 下载 $RAW_BASE/flash-kit/$f"
+		else fetch_to_file "$RAW_BASE/flash-kit/$f" "$KIT_DIR/$f" || warn "下载 $f 失败"; fi
 	done
 	run chmod +x "$KIT_DIR"/*.sh 2>/dev/null || true
 	ok "工具包就位:$KIT_DIR"

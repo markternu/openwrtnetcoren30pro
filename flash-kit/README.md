@@ -1,5 +1,13 @@
 # 刷机工具包(树莓派 TFTP 整刷)
 
+
+> 🚀 **最省事**:树莓派刚装好系统时,一条命令就能把本工具包 + TFTP + 固件全部搞定:
+> ```sh
+> sh -c "$(curl -fsSL https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/install-pi.sh)"
+> # 或者: sh -c "$(wget -qO- .../main/install-pi.sh)"
+> ```
+> 想手工一步一步来,再照下面做。
+
 这套脚本把前三轮实战中踩过的坑**固化成了命令**,配合 u-boot 的 TFTP 恢复模式整机刷写固件。
 
 > 适用:Netcore N30 Pro(Netis NX30V2 / POWER30AX / GW3001 / GLC W7 同硬件),

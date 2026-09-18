@@ -25,12 +25,39 @@ openclash/passwall 依赖内核模块齐备。
 
 ---
 
-## 一键安装(刷完新系统先做这两个任务)
+## 一键安装
 
-> 仓库是**公开**的,不需要登录。OpenWrt 固件默认只带 `uclient-fetch`(没有 curl/wget),
-> 所以下面每条都给了零依赖版本。
+> 仓库是**公开**的,不需要登录。脚本全部存在本仓库,用法与 ohmyzsh 官方一致:`sh -c "$(curl ...)"`。
 
-### 任务 1 · oh-my-zsh(第一件要做的事)
+### 🍓 树莓派(推荐:一条命令搞定全部)
+
+刚烧好 Raspberry Pi OS、SSH 进去后的**第一条命令**:
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/install-pi.sh)"
+sh -c "$(wget -qO-  https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/install-pi.sh)"
+# 国内更快(jsDelivr 镜像):
+sh -c "$(curl -fsSL https://cdn.jsdelivr.net/gh/markternu/openwrtnetcoren30pro@main/install-pi.sh)"
+```
+
+它会**按顺序自动完成**(幂等,可重复运行):
+
+| 顺序 | 内容 |
+|---|---|
+| 1️⃣ **第一个安装任务** | **oh-my-zsh**(装 zsh/git → 克隆 → 写 `.zshrc` → 换登录 shell;GitHub 失败自动切 Gitee) |
+| 2️⃣ | 安装 **TFTP 服务**(`tftpd-hpa` + `tcpdump`,目录 `/srv/tftp`) |
+| 3️⃣ | 从本仓库 **Releases 下载最新定制 OpenWrt 固件**,`sha256` 校验后放进 `/srv/tftp`(顺带下官方 u-boot FIP) |
+| 4️⃣ | 下载**刷机工具包**到 `~/n30kit`(救砖网络 / 收尾 / 刷后自检 / 固件下载器) |
+| 5️⃣ | 打印下一步:只需再跑 `sudo ~/n30kit/pi-net-on.sh` 就能按 Reset 刷机 |
+
+常用参数:`--no-omz` / `--no-tftp` / `--no-firmware` / `--mirror` / `--version v1.0.0` /
+`--base-url <镜像>` / `--without-uboot` / `--dry-run`(预演,不改动系统)。
+
+### 路由器(刷完定制固件后)
+
+> OpenWrt 固件默认只带 `uclient-fetch`(没有 curl/wget),所以额外给了零依赖版本。
+
+#### 任务 1 · oh-my-zsh(第一件要做的事)
 
 ```sh
 # OpenWrt 路由器(零依赖,推荐)
@@ -51,7 +78,7 @@ sh -c "$(wget -qO-  https://raw.githubusercontent.com/markternu/openwrtnetcoren3
 ... install.sh -- --dry-run       # 只预览,不改动
 ```
 
-### 任务 2 · 其他(常用工具 / 代理插件 / 树莓派刷机环境)
+#### 任务 2 · 其他(常用工具 / 代理插件)
 
 ```sh
 BASE=https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main
@@ -65,8 +92,7 @@ sh -c "$(uclient-fetch -O - $BASE/install-extras.sh)" -- --with-proxy
 # 路由器:网页终端(浏览器操作,端口 7681)
 sh -c "$(uclient-fetch -O - $BASE/install-extras.sh)" -- --with-ttyd
 
-# 树莓派:一条命令装好刷机工具包 + TFTP + 最新固件(校验后就位)
-sh -c "$(wget -qO- $BASE/install-extras.sh)" -- --with-flash-kit --with-tftp --with-firmware
+# (树莓派的对应需求已由上面的 install-pi.sh 一条命令覆盖)
 ```
 
 > 💾 oh-my-zsh 约占 20–30MB,装前先 `df -h /overlay` 看剩余空间(不足 40MB 就别装)。
@@ -135,7 +161,8 @@ apk add luci-app-passwall luci-i18n-passwall-zh-cn
 ## 仓库结构
 
 ```
-install.sh            一键安装:oh-my-zsh(刷完新系统的第一个任务)
+install-pi.sh         🍓 树莓派一站式一键安装(oh-my-zsh + TFTP + 固件 + 工具包)
+install.sh            一键安装:oh-my-zsh(路由器刷完新系统的第一个任务)
 install-extras.sh     一键安装:其他(常用工具/代理插件/树莓派刷机环境)
 docs/          技术报告、根因分析、刷机教程、实战复盘、复现编译说明
 patches/       设备树 / 升级脚本 / 包列表 / 编译期修补(附说明)
