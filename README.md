@@ -109,6 +109,16 @@ sh -c "$(uclient-fetch -O - $BASE/install-extras.sh)" -- --with-ttyd
 
 **在电脑上**:到 [Releases](../../releases) 下载下表资产。
 
+**下载通道说明**(只有两条,且都来自本仓库,不依赖任何第三方镜像站):
+
+| 通道 | 地址形态 | 说明 |
+|---|---|---|
+| ① GitHub 直链 | `github.com/<repo>/releases/download/<tag>/<file>` | Release 官方资产 |
+| ② jsDelivr CDN | `cdn.jsdelivr.net/gh/<repo>@main/firmware/<file>` | jsDelivr 只是 CDN,**镜像的是本仓库 `firmware/` 目录里真实提交的文件**(所以仓库内保留了一份固件副本,约 27MB) |
+
+`install-pi.sh` / `flash-kit/pi-fetch-firmware.sh` 会依次尝试这两条通道并**自动重试**,
+下载完一律用 `SHA256SUMS` 校验;你也可以用 `--base-url` 指定自己的镜像。
+
 **也可以在设备上直接下**(仓库公开,无需登录):
 
 ```sh
@@ -169,6 +179,7 @@ patches/       设备树 / 升级脚本 / 包列表 / 编译期修补(附说明)
 packages/      本地 OpenWrt 包:usbfix(/usr/sbin/usb-fix-check 自检)
 flash-kit/     树莓派 TFTP 刷机工具包(脚本 + 步骤 + 排错表)
 scripts/       apply-patches.sh / build.sh(一键复现编译)
+firmware/      固件副本(供 jsDelivr CDN 镜像,内容与 Release 一致)
 release/       最新固件的 SHA256SUMS 与包清单
 appendix/      开发过程原始记录(非正式文档)
 ```
