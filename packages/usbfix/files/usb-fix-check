@@ -1,0 +1,51 @@
+#!/bin/sh
+# USB VBUS 修复自检脚本 (Netcore N30 Pro)
+DT=/sys/firmware/devicetree/base
+
+echo "================ USB VBUS 修复自检 ================"
+echo "--- 1. 固件指纹(本次交付应为 r37877-n30pro) ---"
+grep -E "DISTRIB_REVISION|DISTRIB_DESCRIPTION" /etc/openwrt_release 2>/dev/null
+echo "构建标识: $(cat /etc/usb-fix-id 2>/dev/null)"
+echo
+echo "--- 2. 实时设备树是否含本次修复 ---"
+if [ -d "$DT/regulator-usb-vbus" ]; then
+	echo "OK   regulator-usb-vbus 节点存在"
+	[ -e "$DT/regulator-usb-vbus/regulator-always-on" ] && echo "OK   regulator-always-on 已生效"
+else
+	echo "缺失 regulator-usb-vbus  -> 当前运行的不是修复固件"
+fi
+if [ -e "$DT/soc/usb@11200000/vbus-supply" ]; then
+	echo "OK   xhci(usb@11200000) 节点含 vbus-supply"
+	[ -e "$DT/soc/usb@11200000/vbus-supply" ] && printf "     vbus-supply 指向 phandle: " && od -An -tx4 "$DT/soc/usb@11200000/vbus-supply" | tr -d ' \n' && echo
+else
+	echo "缺失 vbus-supply         -> 当前运行的不是修复固件"
+fi
+echo
+echo "--- 3. regulator 一览 ---"
+if [ -f /sys/kernel/debug/regulator/regulator_summary ]; then
+	grep -iE "usb|vbus|3p3v" /sys/kernel/debug/regulator/regulator_summary 2>/dev/null || cat /sys/kernel/debug/regulator/regulator_summary
+else
+	ls -l /sys/class/regulator/ 2>/dev/null | head
+fi
+echo
+echo "--- 4. GPIO(关注 23 号是否 out hi) ---"
+cat /sys/kernel/debug/gpio 2>/dev/null | head -50 || echo "(无 /sys/kernel/debug/gpio)"
+echo
+echo "--- 5. UBI 卷(u-boot 从 fit 卷引导) ---"
+ubinfo /dev/ubi0 2>/dev/null | grep -E "Volume|Name|Size" | head -12 || echo "(无 ubinfo)"
+echo
+echo "--- 6. 内核 USB 相关日志 ---"
+dmesg 2>/dev/null | grep -iE "vbus|regulator|xhci|usb 1-|usb 2-|new .* USB device" | tail -25
+echo
+echo "--- 7. USB 网络/串口驱动(.ko) ---"
+ls /lib/modules/*/ 2>/dev/null | grep -E "cdc_ether|rndis_host|cdc_ncm|cdc-acm|usbnet|mii|usb-storage|uas" | sort
+echo
+echo "--- 8. 已安装的 usb 相关包 ---"
+(apk info 2>/dev/null || opkg list-installed 2>/dev/null) | grep -i usb | sort
+echo
+echo "--- 9. 当前 USB 总线上的设备(插上 F50 后应多出 1-1 / 2-1) ---"
+ls /sys/bus/usb/devices/
+echo
+echo "--- 10. 网卡接口(F50 识别后会出现 usb0 或 ethX) ---"
+ip -br link
+echo "================ 自检结束 ================"
