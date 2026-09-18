@@ -1,0 +1,12 @@
+--- a/package/base-files/Makefile
++++ b/package/base-files/Makefile
+@@ (apk 打包需要合法的 -rN 版本后缀,原 ipk 风格 "~" 被 apk 拒绝)
+@@
+   TITLE:=Base filesystem for OpenWrt
+   URL:=http://openwrt.org/
+-  VERSION:=$(PKG_RELEASE)~$(lastword $(subst -, ,$(REVISION)))
++  VERSION:=$(PKG_RELEASE)-r1
+ endef
+@@
+-	echo $(PKG_RELEASE)~$(lastword $(subst -, ,$(REVISION))) >$(STAGING_DIR)/base-files.version
++	echo $(PKG_RELEASE)-r1 >$(STAGING_DIR)/base-files.version

@@ -1,0 +1,15 @@
+--- a/target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh
++++ b/target/linux/mediatek/filogic/base-files/lib/upgrade/platform.sh
+@@ (根因修复:设备身份是 netcore,n30pro,但 fit_do_upgrade / fit_check_image
+@@  白名单里没有它 -> 系统内 sysupgrade 落到兜底 nand_do_upgrade(CI_KERNPART=kernel),
+@@  把镜像写进了名为 kernel 的 UBI 卷,而 u-boot 只从 fit 卷引导,表现为"刷机成功但没生效")
+@@ platform_do_upgrade()
+@@
+ 	mercusys,mr90x-v1-ubi|\
++	netcore,n30pro|\
+ 	netis,nx30v2|\
+@@ platform_check_image()
+@@
+ 	mercusys,mr90x-v1-ubi|\
++	netcore,n30pro|\
+ 	nokia,ea0326gmp|\

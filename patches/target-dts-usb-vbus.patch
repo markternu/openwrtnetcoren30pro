@@ -1,0 +1,34 @@
+--- /tmp/pristine/immortalwrt-3c71dfc2b67dc7808d110afa66d66527f4b2ce2e/target/linux/mediatek/dts/mt7981b-netcore-n30pro.dts	2026-06-10 11:50:48
++++ mt7981b-netcore-n30pro.dts	2026-09-10 11:23:51
+@@ -48,6 +48,22 @@
+ 			gpios = <&pio 8 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
++
++	/* USB VBUS 5V 供电:由 GPIO 23(高有效)控制,
++	 * 与同 ODM(netis NX32U 等)及社区已验证方案一致。
++	 * 缺少该节点时 xhci-mtk 只能拿到 dummy regulator,
++	 * USB 口物理上无 5V 输出 → 设备(中兴 F50 等)完全不启动。
++	 */
++	usb_vbus: regulator-usb-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpios = <&pio 23 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
+ 
+ /*
+@@ -98,5 +114,6 @@
+ };
+ 
+ &xhci {
++	vbus-supply = <&usb_vbus>;
+ 	status = "okay";
+-};
+\ No newline at end of file
++};

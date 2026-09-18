@@ -1,0 +1,11 @@
+--- /tmp/pristine/immortalwrt-3c71dfc2b67dc7808d110afa66d66527f4b2ce2e/target/linux/mediatek/image/filogic.mk	2026-06-10 11:50:48
++++ /Users/wt/Desktop/luyouqi/work/out3/final-filogic.mk	2026-09-10 19:14:17
+@@ -2663,7 +2663,7 @@
+   DEVICE_DTS_DIR := ../dts
+   DEVICE_DTC_FLAGS := --pad 4096
+   DEVICE_DTS_LOADADDR := 0x43f00000
+-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 kmod-usb-storage block-mount
++  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3 kmod-usb-storage kmod-usb-storage-uas block-mount kmod-usb-net kmod-usb-net-cdc-ether kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-acm luci luci-ssl luci-i18n-base-zh-cn luci-theme-bootstrap kmod-tun kmod-nft-tproxy kmod-nft-socket kmod-nft-nat kmod-nf-reject kmod-nf-reject6 kmod-inet-diag kmod-netlink-diag kmod-nft-fib usbfix
+   KERNEL_LOADADDR := 0x44000000
+   KERNEL := kernel-bin | gzip
+   KERNEL_INITRAMFS := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k

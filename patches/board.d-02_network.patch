@@ -1,0 +1,12 @@
+--- a/target/linux/mediatek/filogic/base-files/etc/board.d/02_network
++++ b/target/linux/mediatek/filogic/base-files/etc/board.d/02_network
+@@ (为 netcore,n30pro 补上默认 LAN/WAN 映射;否则全新安装会落到兜底分支
+@@  把 WAN 指向不存在的设备 "wan",表现成"刷完没网")
+@@
+ 	konka,komi-a31|\
++	netcore,n30pro)
++		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4" eth1
++		;;
++
+ 	netis,nx30v2|\
+ 	netis,nx31|\
