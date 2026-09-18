@@ -1,0 +1,21 @@
+# 固件二进制不进 git(通过 GitHub Releases 分发)
+*.itb
+*.bin
+*.fip
+*.apk
+firmware/
+kmods-apk/
+
+# 系统/编辑器
+.DS_Store
+*.swp
+*~
+
+# 编译产物(如在本目录内编译)
+build_dir/
+staging_dir/
+bin/
+tmp/
+dl/
+feeds/
+logs/
