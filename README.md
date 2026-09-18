@@ -25,6 +25,54 @@ openclash/passwall 依赖内核模块齐备。
 
 ---
 
+## 一键安装(刷完新系统先做这两个任务)
+
+> 仓库是**公开**的,不需要登录。OpenWrt 固件默认只带 `uclient-fetch`(没有 curl/wget),
+> 所以下面每条都给了零依赖版本。
+
+### 任务 1 · oh-my-zsh(第一件要做的事)
+
+```sh
+# OpenWrt 路由器(零依赖,推荐)
+sh -c "$(uclient-fetch -O - https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/install.sh)"
+
+# 有 curl / wget 的系统(与 ohmyzsh 安装方式同款)
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/install.sh)"
+sh -c "$(wget -qO-  https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/install.sh)"
+```
+
+自动:装 `zsh`(+`git`/证书)→ 克隆 oh-my-zsh(GitHub 失败自动切 Gitee 镜像)→
+写 `~/.zshrc`(原文件备份)→ 把登录 shell 换成 zsh。装完 `exec zsh` 进入。
+
+```sh
+... install.sh -- --mirror        # 国内走 Gitee 镜像
+... install.sh -- --theme agnoster
+... install.sh -- --uninstall     # 卸载并还原
+... install.sh -- --dry-run       # 只预览,不改动
+```
+
+### 任务 2 · 其他(常用工具 / 代理插件 / 树莓派刷机环境)
+
+```sh
+BASE=https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main
+
+# 路由器:常用工具 + 自动跑一次 USB 自检
+sh -c "$(uclient-fetch -O - $BASE/install-extras.sh)"
+
+# 路由器:OpenClash + PassWall(内核模块本项目固件已内置)
+sh -c "$(uclient-fetch -O - $BASE/install-extras.sh)" -- --with-proxy
+
+# 路由器:网页终端(浏览器操作,端口 7681)
+sh -c "$(uclient-fetch -O - $BASE/install-extras.sh)" -- --with-ttyd
+
+# 树莓派:一条命令装好刷机工具包 + TFTP + 最新固件(校验后就位)
+sh -c "$(wget -qO- $BASE/install-extras.sh)" -- --with-flash-kit --with-tftp --with-firmware
+```
+
+> 💾 oh-my-zsh 约占 20–30MB,装前先 `df -h /overlay` 看剩余空间(不足 40MB 就别装)。
+
+---
+
 ## 快速开始
 
 > 🍼 **完全新手(从快递箱开始)请看** →
@@ -87,6 +135,8 @@ apk add luci-app-passwall luci-i18n-passwall-zh-cn
 ## 仓库结构
 
 ```
+install.sh            一键安装:oh-my-zsh(刷完新系统的第一个任务)
+install-extras.sh     一键安装:其他(常用工具/代理插件/树莓派刷机环境)
 docs/          技术报告、根因分析、刷机教程、实战复盘、复现编译说明
 patches/       设备树 / 升级脚本 / 包列表 / 编译期修补(附说明)
 packages/      本地 OpenWrt 包:usbfix(/usr/sbin/usb-fix-check 自检)
