@@ -33,7 +33,20 @@ openclash/passwall 依赖内核模块齐备。
 
 ### 1. 下载固件
 
-到 [Releases](../../releases) 下载:
+**在电脑上**:到 [Releases](../../releases) 下载下表资产。
+
+**也可以在设备上直接下**(仓库公开,无需登录):
+
+```sh
+# 树莓派 / 路由器 / 任意 Linux:
+BASE=https://github.com/markternu/openwrtnetcoren30pro/releases/latest/download
+curl -fLO $BASE/immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb
+curl -fLO $BASE/SHA256SUMS
+grep netis_nx30v2 SHA256SUMS > check.txt && sha256sum -c check.txt && rm check.txt
+```
+
+> 树莓派上更省事的做法:`flash-kit/pi-fetch-firmware.sh --install` 会自动取最新版本、
+> 下载、校验 sha256 并放进 `/srv/tftp`。
 
 | 资产 | 用途 |
 |---|---|

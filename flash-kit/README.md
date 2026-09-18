@@ -25,38 +25,60 @@ MacBook ──WiFi/SSH──> 树莓派 ──网线(eth0)──> 路由器(进 
 
 ## 步骤
 
-### 0. Mac 上取物料
+### 0. 把脚本弄到树莓派上(二选一)
+
+**情况 A(推荐,树莓派能上外网)**:树莓派自己从公开仓库拉脚本,连 Mac 都不用
 
 ```sh
-cd /Users/wt/Desktop/luyouqi/deliverables/firmware
-shasum -a 256 immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb
-# 应为 c8ff1c45b053680261074e5faa41c7d25b653004154c7b86af4c6775e5af3eb7
+# 在树莓派上执行(SSH 进去之后)
+mkdir -p ~/n30kit && cd ~/n30kit
+for f in pi-setup-tftp.sh pi-fetch-firmware.sh pi-net-on.sh pi-net-off.sh verify-after-boot.sh; do
+    curl -fsSLO https://raw.githubusercontent.com/markternu/openwrtnetcoren30pro/main/flash-kit/$f
+done
+ls -la
 ```
 
-### 1. 传到树莓派
+**情况 B(树莓派不能上外网)**:在 Mac 上下载仓库(zip 或 clone)后 scp 过去
 
 ```sh
-PI=mypi@192.168.1.165        # 改成你的树莓派地址(WiFi 那个)
-scp -O immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb \
-       immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb \
-       pi-setup-tftp.sh pi-net-on.sh pi-net-off.sh verify-after-boot.sh \
-       $PI:/tmp/
+PI=mypi@raspberrypi.local        # 改成你的树莓派地址(WiFi 那个)
+scp -O flash-kit/*.sh $PI:/tmp/
 ```
 
-### 2. 树莓派:装 TFTP 服务并放入固件(此时树莓派还能上网)
+### 1. 树莓派:装 TFTP 服务
 
 ```sh
 ssh $PI
-sudo sh /tmp/pi-setup-tftp.sh /tmp/immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb \
-                               /tmp/immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb
+sudo sh ~/n30kit/pi-setup-tftp.sh          # 情况 B 则用 /tmp/pi-setup-tftp.sh
 ```
 
-脚本会安装 `tftpd-hpa`/`tcpdump`、配置 `/srv/tftp`、拷贝固件并打印 sha256(必须 = `c8ff1c45…`)。
+装了 `tftpd-hpa` + `tcpdump`(`curl`),建好 `/srv/tftp`。
+
+### 2. 树莓派:直接下载官方固件并校验就位(无需 Mac 中转)
+
+```sh
+sudo sh ~/n30kit/pi-fetch-firmware.sh --install
+```
+
+做了四件事:自动取**最新 Release**(取不到回落 `v1.0.0`)→ 下载 `SHA256SUMS` 与两个 `.itb`
+→ **自动校验 sha256** → 复制进 `/srv/tftp` 并重启服务。
+
+可选参数:
+
+```sh
+--with-uboot          # 顺便下载"从原厂系统开始"要用的官方 u-boot FIP
+--version v1.0.0      # 指定版本
+--base-url https://<镜像前缀>/https://github.com   # 走镜像(国内网络慢时)
+--dest /tmp/xxx       # 指定下载目录
+```
+
+> Mac 中转的备用做法(仅当树莓派完全没网时):Mac 上从仓库 Releases 下载两个 `.itb`,
+> 再 `scp -O *.itb $PI:/tmp/` 然后 `sudo sh ~/n30kit/pi-setup-tftp.sh /tmp/*.itb`。
 
 ### 3. 树莓派:打开救砖链路(三个大坑都在这里)
 
 ```sh
-sudo sh /tmp/pi-net-on.sh
+sudo sh ~/n30kit/pi-net-on.sh
 ```
 
 它做了四件事(全部来自实战踩坑):
@@ -97,7 +119,7 @@ sudo tcpdump -i eth0 -n -e udp port 69
 
 ```sh
 # Mac 上:
-ssh root@192.168.1.1 'sh -s' < /tmp/verify-after-boot.sh
+ssh root@192.168.1.1 'sh -s' < ~/n30kit/verify-after-boot.sh
 # 或先把脚本拷到路由器再跑
 ```
 
@@ -107,9 +129,9 @@ PASS 标准:`DISTRIB_REVISION=r37877-n30pro`;9 个代理 kmod 全部 OK;`dmesg` 
 ### 7. 收尾
 
 ```sh
-sudo sh /tmp/pi-net-off.sh          # 删掉恢复路由/连接,rp_filter 复原
+sudo sh ~/n30kit/pi-net-off.sh          # 删掉恢复路由/连接,rp_filter 复原
 # 或保留连接只改回 DHCP:
-sudo sh /tmp/pi-net-off.sh --restore-dhcp
+sudo sh ~/n30kit/pi-net-off.sh --restore-dhcp
 ```
 
 ---

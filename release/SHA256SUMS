@@ -1,1 +1,6 @@
 c8ff1c45b053680261074e5faa41c7d25b653004154c7b86af4c6775e5af3eb7  immortalwrt-mediatek-filogic-netcore_n30pro-squashfs-sysupgrade.itb
+c8ff1c45b053680261074e5faa41c7d25b653004154c7b86af4c6775e5af3eb7  immortalwrt-mediatek-filogic-netis_nx30v2-squashfs-sysupgrade.itb
+28dd45d9bf76121f968ed958c55bcd492e84fc31551e39d3ad12951007190acd  immortalwrt-mediatek-filogic-netcore_n30pro-initramfs.itb
+28dd45d9bf76121f968ed958c55bcd492e84fc31551e39d3ad12951007190acd  immortalwrt-mediatek-filogic-netis_nx30v2-initramfs.itb
+2be58bcb1725d60f04b05c958a98c712d54c26fc16b0379044427534fe55b936  immortalwrt-mediatek-filogic-netcore_n30pro.manifest
+# kmods-apk-v1.0.0.zip(离线 kmod 集合)不在此清单内,按需自行核对
